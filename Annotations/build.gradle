@@ -1,5 +1,8 @@
 plugins {
     id 'java'
+    id "com.jfrog.artifactory" version "4.5.4"
+    id "com.jfrog.bintray" version "1.7.3"
+    id "maven-publish"
 }
 
 def versionMajor = 1
@@ -11,4 +14,114 @@ version "${versionMajor}.${versionMinor}.${versionPatch}"
 
 dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.12'
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+javadoc.failOnError = false
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+artifacts {
+    archives sourcesJar
+    archives javadocJar
+}
+
+def pomConfig = {
+    licenses {
+        license {
+            name = "GNU General Public License version 3"
+            url = "https://www.gnu.org/licenses/gpl-3.0.en.html"
+            distribution = "repo"
+        }
+    }
+    developers {
+        developer {
+            id = "christophecvb"
+            name = "Christophe Carvalho Vilas-Boas"
+            email = "christophe.carvalhovilasboas@gmail.com"
+        }
+    }
+
+    scm {
+        url "https://github.com/ChristopheCVB/TouchPortalPluginSDK"
+    }
+}
+
+publishing {
+    publications {
+        mavenPublication(MavenPublication) {
+            from components.java
+            artifact sourcesJar {
+                classifier "sources"
+            }
+            artifact javadocJar {
+                classifier "javadoc"
+            }
+            groupId project.group
+            artifactId project.name
+            version project.version
+            pom.withXml {
+                def root = asNode()
+                root.appendNode('description', 'Touch Portal Plugin SDK Annotations')
+                root.appendNode('name', 'Annotations')
+                root.appendNode('url', 'https://github.com/ChristopheCVB/TouchPortalPluginSDK')
+                root.children().last() + pomConfig
+            }
+        }
+    }
+}
+
+artifactory {
+    contextUrl = 'http://oss.jfrog.org'
+    publish {
+        repository {
+            repoKey = 'oss-snapshot-local'
+            username = bintrayUser
+            password = bintrayKey
+        }
+        defaults {
+            publications('mavenPublication')
+            publishArtifacts = true
+            publishPom = true
+            properties = [
+                    'build.number': version,
+                    'build.name': project.name
+            ]
+        }
+    }
+    resolve {
+        repoKey = 'jcenter'
+    }
+    clientConfig.info.setBuildNumber(version.toString())
+    clientConfig.info.setBuildName(project.name)
+}
+
+bintray {
+    user = bintrayUser
+    key = bintrayKey
+    publications = ['mavenPublication']
+
+    pkg {
+        repo = 'TouchPortalPluginSDK'
+        name = project.name
+        userOrg = 'TouchPortal'
+        licenses = ['GPL-3.0']
+        vcsUrl = 'https://github.com/ChristopheCVB/TouchPortalPluginSDK'
+        version {
+            name = project.version
+            desc = "build ${version}"
+            released  = new Date()
+            gpg {
+                sign = true
+            }
+        }
+    }
+
+    publish = true
 }
